@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -55,6 +56,12 @@ import (
 const (
 	// File name to use for storing workerAuth requests
 	WorkerAuthReqFile = "auth_request_token"
+)
+
+var (
+	// This regular expression is used to find all instances of square brackets within a string.
+	// This regular expression is used to remove the square brackets from an IPv6 address.
+	squareBrackets = regexp.MustCompile("\\[|\\]")
 )
 
 func init() {
@@ -845,6 +852,15 @@ func (b *Server) SetupWorkerPublicAddress(conf *config.Config, flagValue string)
 			return fmt.Errorf("Error splitting public adddress host/port: %w", err)
 		}
 	}
+
+	// remove the square brackets from the ipv6 address because the method
+	// net.JoinHostPort() will add a second pair of square brackets.
+	host = squareBrackets.ReplaceAllString(host, "")
+	ipAddr := net.ParseIP(host)
+	if ipAddr.To4() == nil && ipAddr.To16() == nil {
+		return fmt.Errorf("Error parsing address: %s", ipAddr.String())
+	}
+
 	conf.Worker.PublicAddr = net.JoinHostPort(host, port)
 	return nil
 }
